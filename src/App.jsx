@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import './index.css';
 import StarRating from './StarRating';
+import './index.css';
 
-const KEY = '5723fb06';
+const KEY = 'your api key';
 
 //////////////////////////////////////////////
 ////////    STRUCTURAL COMPONENTS    ////////
 
 function App() {
-  const [query, setQuery] = useState('interstellar');
+  const [query, setQuery] = useState('');
   const [movies, setMovies] = useState([]);
   const [watched, setWatched] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,49 +32,59 @@ function App() {
   }
 
   // fetches a movie
-  useEffect(
-    function () {
-      async function fetchMovies() {
-        try {
-          // loading started ...
-          setIsLoading(true);
-          setError('');
+  function handleMovieSearch(query) {
+    const controller = new AbortController();
 
-          const res = await fetch(
-            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
-          );
+    setQuery(query);
 
-          if (!res.ok)
-            throw new Error('Something went wrong with fetching movies');
-
-          const data = await res.json();
-          if (data.Response === 'False') throw new Error('Movie not found');
-
-          setMovies(data.Search);
-          //
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          // ... loading finished
-          setIsLoading(false);
-        }
-      }
-
-      if (query.length < 3) {
-        setMovies([]);
+    async function fetchMovies() {
+      try {
+        // loading started ...
+        setIsLoading(true);
         setError('');
-        return;
-      }
 
-      fetchMovies();
-    },
-    [query]
-  );
+        const res = await fetch(
+          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+          { signal: controller.signal }
+        );
+
+        if (!res.ok)
+          throw new Error('Something went wrong with fetching movies');
+
+        const data = await res.json();
+        if (data.Response === 'False') throw new Error('Movie not found');
+
+        setMovies(data.Search);
+        setError('');
+        //
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setError(err.message);
+        }
+      } finally {
+        // ... loading finished
+        setIsLoading(false);
+      }
+    }
+
+    if (query.length < 3) {
+      setMovies([]);
+      setError('');
+      return;
+    }
+
+    handleCloseMovie();
+    fetchMovies();
+
+    return function () {
+      controller.abort();
+    };
+  }
 
   return (
     <>
       <NavBar>
-        <Search query={query} setQuery={setQuery} />
+        <Search query={query} onMovieSearch={handleMovieSearch} />
         <NumResults movies={movies} />
       </NavBar>
 
@@ -140,14 +150,14 @@ function Main({ children }) {
 
 // NavBar
 
-function Search({ query, setQuery }) {
+function Search({ query, onMovieSearch }) {
   return (
     <input
       className='search'
       type='text'
       placeholder='Search movies...'
       value={query}
-      onChange={(e) => setQuery(e.target.value)}
+      onChange={(e) => onMovieSearch(e.target.value)}
     />
   );
 }
@@ -250,6 +260,36 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     [selectedId]
   );
 
+  // update title and clean up
+  useEffect(
+    function () {
+      if (!title) return;
+      document.title = `Movie | ${title}`;
+
+      return function () {
+        document.title = 'usePopcorn';
+      };
+    },
+    [title]
+  );
+
+  useEffect(
+    function () {
+      function callback(e) {
+        if (e.code === 'Escape') {
+          onCloseMovie();
+        }
+      }
+
+      document.addEventListener('keydown', callback);
+
+      return function () {
+        document.removeEventListener('keydown', callback);
+      };
+    },
+    [onCloseMovie]
+  );
+
   return (
     <div className='details'>
       {isLoading ? (
@@ -276,7 +316,7 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
                 <>
                   <StarRating
                     maxRating={10}
-                    size={24}
+                    size={[24]}
                     onSetRating={setUserRating}
                   />
 
