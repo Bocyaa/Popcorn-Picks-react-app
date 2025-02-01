@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import StarRating from './StarRating';
 import './index.css';
 
-const KEY = 'your api key';
+const KEY = import.meta.env.VITE_API_KEY;
 
 //////////////////////////////////////////////
 ////////    STRUCTURAL COMPONENTS    ////////
@@ -10,10 +10,15 @@ const KEY = 'your api key';
 function App() {
   const [query, setQuery] = useState('');
   const [movies, setMovies] = useState([]);
-  const [watched, setWatched] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+
+  // const [watched, setWatched] = useState([]);
+  const [watched, setWatched] = useState(function () {
+    const storedValue = localStorage.getItem('watched');
+    return JSON.parse(storedValue);
+  });
 
   function handleSelectMovie(id) {
     setSelectedId((selectedId) => (id === selectedId ? null : id));
@@ -30,6 +35,13 @@ function App() {
   function handleDeleteWatched(id) {
     setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
   }
+
+  useEffect(
+    function () {
+      localStorage.setItem('watched', JSON.stringify(watched));
+    },
+    [watched]
+  );
 
   // fetches a movie
   function handleMovieSearch(query) {
@@ -84,7 +96,11 @@ function App() {
   return (
     <>
       <NavBar>
-        <Search query={query} onMovieSearch={handleMovieSearch} />
+        <Search
+          query={query}
+          onMovieSearch={handleMovieSearch}
+          setQuery={setQuery}
+        />
         <NumResults movies={movies} />
       </NavBar>
 
@@ -149,8 +165,26 @@ function Main({ children }) {
 /////////////    COMPONENTS    //////////////
 
 // NavBar
-
 function Search({ query, onMovieSearch }) {
+  const inputEl = useRef(null);
+
+  useEffect(
+    function () {
+      function callback(e) {
+        if (document.activeElement === inputEl.current) return;
+
+        if (e.code === 'Enter') {
+          inputEl.current.focus();
+          onMovieSearch('');
+        }
+      }
+
+      document.addEventListener('keydown', callback);
+      return () => document.addEventListener('keydown', callback);
+    },
+    [onMovieSearch]
+  );
+
   return (
     <input
       className='search'
@@ -158,6 +192,7 @@ function Search({ query, onMovieSearch }) {
       placeholder='Search movies...'
       value={query}
       onChange={(e) => onMovieSearch(e.target.value)}
+      ref={inputEl}
     />
   );
 }
@@ -210,6 +245,15 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
   const [isLoading, setIsLoading] = useState(false);
   const [userRating, setUserRating] = useState('');
 
+  const countRef = useRef(0);
+
+  useEffect(
+    function () {
+      if (userRating) countRef.current++;
+    },
+    [userRating]
+  );
+
   const isWatched = watched.map((movie) => movie.imdbID).includes(selectedId);
   const watchedUserRating = watched.find(
     (movie) => movie.imdbID === selectedId
@@ -237,6 +281,7 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
       imdbRating: Number(imdbRating),
       runtime: Number(runtime.split(' ').at(0)),
       userRating,
+      countRatingDecisions: countRef.current,
     };
 
     onAddWatched(newWatchedMovie);
@@ -343,7 +388,6 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
 }
 
 // Watched
-
 function Box({ children }) {
   const [isOpen, setIsOpen] = useState(true);
 
