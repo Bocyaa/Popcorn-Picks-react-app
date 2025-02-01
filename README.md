@@ -1,7 +1,7 @@
 # usePopcorn
 
-![App Screenshot 1](Movie Details.png)
-![App Screenshot 2](Watched List.png)
+![App Screenshot 1](movieDetails.png)
+![App Screenshot 2](watchedList.png)
 
 ## Overview
 
