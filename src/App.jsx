@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import StarRating from './StarRating';
 import './index.css';
-
+import { useMovies } from './useMovies';
 const KEY = import.meta.env.VITE_API_KEY;
 
 //////////////////////////////////////////////
@@ -9,10 +9,8 @@ const KEY = import.meta.env.VITE_API_KEY;
 
 function App() {
   const [query, setQuery] = useState('');
-  const [movies, setMovies] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const { movies, isLoading, error } = useMovies(query, handleCloseMovie);
 
   // const [watched, setWatched] = useState([]);
   const [watched, setWatched] = useState(function () {
@@ -43,64 +41,10 @@ function App() {
     [watched]
   );
 
-  // fetches a movie
-  function handleMovieSearch(query) {
-    const controller = new AbortController();
-
-    setQuery(query);
-
-    async function fetchMovies() {
-      try {
-        // loading started ...
-        setIsLoading(true);
-        setError('');
-
-        const res = await fetch(
-          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
-          { signal: controller.signal }
-        );
-
-        if (!res.ok)
-          throw new Error('Something went wrong with fetching movies');
-
-        const data = await res.json();
-        if (data.Response === 'False') throw new Error('Movie not found');
-
-        setMovies(data.Search);
-        setError('');
-        //
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          setError(err.message);
-        }
-      } finally {
-        // ... loading finished
-        setIsLoading(false);
-      }
-    }
-
-    if (query.length < 3) {
-      setMovies([]);
-      setError('');
-      return;
-    }
-
-    handleCloseMovie();
-    fetchMovies();
-
-    return function () {
-      controller.abort();
-    };
-  }
-
   return (
     <>
       <NavBar>
-        <Search
-          query={query}
-          onMovieSearch={handleMovieSearch}
-          setQuery={setQuery}
-        />
+        <Search query={query} setQuery={setQuery} />
         <NumResults movies={movies} />
       </NavBar>
 
@@ -165,7 +109,7 @@ function Main({ children }) {
 /////////////    COMPONENTS    //////////////
 
 // NavBar
-function Search({ query, onMovieSearch }) {
+function Search({ query, setQuery }) {
   const inputEl = useRef(null);
 
   useEffect(
@@ -175,14 +119,14 @@ function Search({ query, onMovieSearch }) {
 
         if (e.code === 'Enter') {
           inputEl.current.focus();
-          onMovieSearch('');
+          setQuery('');
         }
       }
 
       document.addEventListener('keydown', callback);
       return () => document.addEventListener('keydown', callback);
     },
-    [onMovieSearch]
+    [setQuery]
   );
 
   return (
@@ -191,7 +135,7 @@ function Search({ query, onMovieSearch }) {
       type='text'
       placeholder='Search movies...'
       value={query}
-      onChange={(e) => onMovieSearch(e.target.value)}
+      onChange={(e) => setQuery(e.target.value)}
       ref={inputEl}
     />
   );
