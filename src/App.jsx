@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import StarRating from './StarRating';
 import './index.css';
 import { useMovies } from './useMovies';
+import { useLocalStorageState } from './useLocalStorageState';
+import { useKey } from './useKey';
 const KEY = import.meta.env.VITE_API_KEY;
 
 //////////////////////////////////////////////
@@ -10,13 +12,10 @@ const KEY = import.meta.env.VITE_API_KEY;
 function App() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  const { movies, isLoading, error } = useMovies(query, handleCloseMovie);
 
-  // const [watched, setWatched] = useState([]);
-  const [watched, setWatched] = useState(function () {
-    const storedValue = localStorage.getItem('watched');
-    return JSON.parse(storedValue);
-  });
+  // custom hooks
+  const { movies, isLoading, error } = useMovies(query, handleCloseMovie);
+  const [watched, setWatched] = useLocalStorageState([], 'watched');
 
   function handleSelectMovie(id) {
     setSelectedId((selectedId) => (id === selectedId ? null : id));
@@ -33,13 +32,6 @@ function App() {
   function handleDeleteWatched(id) {
     setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
   }
-
-  useEffect(
-    function () {
-      localStorage.setItem('watched', JSON.stringify(watched));
-    },
-    [watched]
-  );
 
   return (
     <>
@@ -112,22 +104,11 @@ function Main({ children }) {
 function Search({ query, setQuery }) {
   const inputEl = useRef(null);
 
-  useEffect(
-    function () {
-      function callback(e) {
-        if (document.activeElement === inputEl.current) return;
-
-        if (e.code === 'Enter') {
-          inputEl.current.focus();
-          setQuery('');
-        }
-      }
-
-      document.addEventListener('keydown', callback);
-      return () => document.addEventListener('keydown', callback);
-    },
-    [setQuery]
-  );
+  useKey('Enter', function () {
+    if (document.activeElement === inputEl.current) return;
+    inputEl.current.focus();
+    setQuery('');
+  });
 
   return (
     <input
@@ -232,6 +213,8 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     onCloseMovie();
   }
 
+  useKey('Escape', onCloseMovie);
+
   // run on mount
   useEffect(
     function () {
@@ -260,23 +243,6 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
       };
     },
     [title]
-  );
-
-  useEffect(
-    function () {
-      function callback(e) {
-        if (e.code === 'Escape') {
-          onCloseMovie();
-        }
-      }
-
-      document.addEventListener('keydown', callback);
-
-      return function () {
-        document.removeEventListener('keydown', callback);
-      };
-    },
-    [onCloseMovie]
   );
 
   return (
